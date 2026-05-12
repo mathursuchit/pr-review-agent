@@ -1,53 +1,53 @@
 import pytest
 from pydantic import ValidationError
-from agent.models import Finding, ReviewReport, Severity
+from agent.models import Source, ResearchReport
 
 
-def test_valid_finding():
-    f = Finding(
-        severity=Severity.HIGH,
-        category="security",
-        file_path="src/auth.py",
-        description="Missing input validation",
-        suggestion="Add Pydantic validator",
+def test_valid_source():
+    s = Source(
+        url="https://arxiv.org/abs/2305.14627",
+        title="Survey of LLM Agents",
+        relevance_score=0.9,
+        trust_score=0.9,
+        excerpt="This paper surveys...",
     )
-    assert f.severity == Severity.HIGH
+    assert s.relevance_score == 0.9
 
 
-def test_valid_empty_report():
-    report = ReviewReport(
-        pr_url="https://github.com/owner/repo/pull/1",
-        summary="No issues found",
-        findings=[],
-        risk_score=0.0,
-        model_used="gpt-4o-mini",
-        tokens_used=100,
-        cached=False,
-    )
-    assert report.risk_score == 0.0
-
-
-def test_risk_score_too_high():
+def test_source_score_bounds():
     with pytest.raises(ValidationError):
-        ReviewReport(
-            pr_url="https://github.com/owner/repo/pull/1",
-            summary="test",
-            findings=[],
-            risk_score=11.0,
-            model_used="gpt-4o-mini",
-            tokens_used=100,
-            cached=False,
+        Source(
+            url="https://example.com",
+            title="test",
+            relevance_score=1.5,
+            trust_score=0.5,
+            excerpt="",
         )
 
 
-def test_risk_score_negative():
+def test_valid_report():
+    report = ResearchReport(
+        question="What is RAG?",
+        summary="RAG combines retrieval with generation.",
+        key_findings=["Retrieval improves factuality", "Chunking strategy matters"],
+        sources=[],
+        confidence_score=0.8,
+        depth_reached=1,
+        tokens_used=1200,
+        cached=False,
+    )
+    assert report.confidence_score == 0.8
+
+
+def test_confidence_out_of_range():
     with pytest.raises(ValidationError):
-        ReviewReport(
-            pr_url="https://github.com/owner/repo/pull/1",
+        ResearchReport(
+            question="test",
             summary="test",
-            findings=[],
-            risk_score=-1.0,
-            model_used="gpt-4o-mini",
+            key_findings=[],
+            sources=[],
+            confidence_score=1.5,
+            depth_reached=1,
             tokens_used=100,
             cached=False,
         )

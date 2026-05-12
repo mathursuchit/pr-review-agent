@@ -1,29 +1,20 @@
 from pydantic import BaseModel, Field
-from enum import Enum
 
 
-class Severity(str, Enum):
-    CRITICAL = "critical"
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-    INFO = "info"
+class Source(BaseModel):
+    url: str
+    title: str
+    relevance_score: float = Field(ge=0.0, le=1.0)
+    trust_score: float = Field(ge=0.0, le=1.0)
+    excerpt: str
 
 
-class Finding(BaseModel):
-    severity: Severity
-    category: str  # "security" | "logic" | "test-coverage"
-    file_path: str
-    line_range: str | None = None
-    description: str
-    suggestion: str
-
-
-class ReviewReport(BaseModel):
-    pr_url: str
+class ResearchReport(BaseModel):
+    question: str
     summary: str
-    findings: list[Finding]
-    risk_score: float = Field(ge=0.0, le=10.0)
-    model_used: str
+    key_findings: list[str]
+    sources: list[Source]
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    depth_reached: int
     tokens_used: int
     cached: bool

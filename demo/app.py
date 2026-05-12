@@ -11,25 +11,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agent.graph import build_graph
 
-st.set_page_config(page_title="PR Review Agent", layout="wide")
-
-SEVERITY_COLORS = {
-    "critical": "#ff4b4b",
-    "high":     "#ff8c00",
-    "medium":   "#ffd700",
-    "low":      "#4b9fff",
-    "info":     "#888888",
-}
+st.set_page_config(page_title="Research Agent", layout="wide")
 
 NODE_LABELS = {
-    "fetch_diff":        "Fetching PR diff from GitHub",
-    "pre_scan":          "Scanning for injection attempts and secrets",
-    "analyze_security":  "Analyzing security vulnerabilities",
-    "analyze_logic":     "Analyzing logic errors and edge cases",
-    "analyze_tests":     "Checking test coverage",
-    "synthesize":        "Synthesizing final report",
-    "post_guardrails":   "Validating output",
-    "reject":            "Review rejected (injection detected)",
+    "search":          "Searching the web",
+    "read_pages":      "Reading pages",
+    "score_relevance": "Scoring source relevance",
+    "decide_next":     "Deciding whether to dig deeper",
+    "synthesize":      "Synthesizing report",
+    "post_guardrails": "Validating citations",
 }
 
 
@@ -38,19 +28,21 @@ def get_graph():
     return build_graph()
 
 
-def stream_review(pr_url: str):
+def stream_research(question: str, max_depth: int):
     graph = get_graph()
     q: queue.Queue = queue.Queue()
 
     initial: dict = {
-        "pr_url": pr_url,
-        "raw_diff": "",
-        "chunks": [],
-        "injection_flagged": False,
-        "secrets_found": [],
-        "security_findings": [],
-        "logic_findings": [],
-        "test_findings": [],
+        "question": question,
+        "search_queries": [],
+        "search_results": [],
+        "pages_read": [],
+        "scored_sources": [],
+        "depth": 0,
+        "max_depth": max_depth,
+        "token_budget": 50_000,
+        "tokens_used": 0,
+        "should_continue": True,
         "final_report": None,
         "guardrail_passed": False,
         "retry_count": 0,
@@ -78,92 +70,72 @@ def stream_review(pr_url: str):
             break
 
 
-def render_findings(findings: list[dict]) -> None:
-    if not findings:
-        st.success("No issues found.")
-        return
-
-    # Group by severity for display order
-    order = ["critical", "high", "medium", "low", "info"]
-    sorted_findings = sorted(findings, key=lambda f: order.index(f.get("severity", "info")))
-
-    for f in sorted_findings:
-        severity = f.get("severity", "info")
-        color = SEVERITY_COLORS.get(severity, "#888888")
-        label = f"[{severity.upper()}]  {f.get('category', '')}  —  {f.get('file_path', 'unknown')}"
-
-        with st.expander(label, expanded=severity in ("critical", "high")):
-            cols = st.columns([1, 2])
-            with cols[0]:
-                st.markdown(f"**Severity**")
-                st.markdown(f"**Category**")
-                st.markdown(f"**File**")
-                if f.get("line_range"):
-                    st.markdown(f"**Lines**")
-            with cols[1]:
-                st.markdown(f":{color.replace('#', '')}[{severity}]" if False else severity)
-                st.markdown(f.get("category", ""))
-                st.code(f.get("file_path", "unknown"), language=None)
-                if f.get("line_range"):
-                    st.markdown(f.get("line_range", ""))
-
-            st.markdown(f"**Issue**")
-            st.markdown(f.get("description", ""))
-            st.markdown(f"**Suggestion**")
-            st.info(f.get("suggestion", ""))
+def trust_label(score: float) -> str:
+    if score >= 0.8:
+        return "high"
+    if score >= 0.5:
+        return "medium"
+    return "low"
 
 
 def main() -> None:
-    st.title("PR Review Agent")
+    st.title("Research Agent")
     st.caption(
-        "Analyzes GitHub pull requests for security issues, logic errors, and missing tests. "
-        "Built with LangGraph — each step is a separate node in the state machine."
+        "Searches the web, reads pages, scores source relevance, and synthesizes a cited report. "
+        "Built with LangGraph — iterates until it has enough high-quality sources or hits the depth limit."
     )
 
     st.divider()
 
-    col_input, col_btn = st.columns([4, 1])
-    with col_input:
-        pr_url = st.text_input(
-            "GitHub PR URL",
-            placeholder="https://github.com/owner/repo/pull/123",
-            label_visibility="collapsed",
-        )
-    with col_btn:
-        run = st.button("Review PR", type="primary", use_container_width=True)
+    question = st.text_area(
+        "Research question",
+        placeholder="What are the production challenges of deploying LLM-based agents at scale?",
+        height=80,
+        label_visibility="collapsed",
+    )
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        max_depth = st.slider("Max search depth", min_value=1, max_value=3, value=2,
+                              help="How many search iterations the agent can run before synthesizing.")
+    with col2:
+        run = st.button("Research", type="primary", use_container_width=True)
 
     if not run:
         st.markdown(
             """
             **How it works**
 
-            1. Fetches the PR diff from the GitHub API
-            2. Scans for prompt injection attempts and secrets before sending anything to the LLM
-            3. Runs three parallel analysis passes: security, logic, test coverage
-            4. Synthesizes findings into a structured report using GPT-4o
-            5. Validates the output — corrects hallucinated file paths, enforces schema
-
-            **Cost:** ~$0.008 per review with default model routing
+            1. Searches the web using Tavily
+            2. Fetches and cleans the top pages
+            3. Scores each source for relevance (0-1) using GPT-4o-mini
+            4. Decides whether to search again with a refined query or synthesize
+            5. Synthesizes a report with key findings and cited sources using GPT-4o
+            6. Validates citations — drops any URL not in the actual source list
             """
         )
         return
 
-    if not pr_url or not pr_url.startswith("https://github.com/"):
-        st.error("Enter a valid GitHub PR URL (https://github.com/owner/repo/pull/N).")
+    if not question.strip():
+        st.error("Enter a research question.")
         return
 
     st.divider()
 
-    # --- Progress ---
     progress_area = st.empty()
     completed: list[str] = []
     final_state: dict | None = None
 
     with st.spinner(""):
-        for event_type, node_name, state in stream_review(pr_url):
+        for event_type, node_name, state in stream_research(question.strip(), max_depth):
             if event_type == "node":
                 label = NODE_LABELS.get(node_name, node_name)
-                completed.append(f"**{label}**")
+                completed.append(label)
+
+                # Show depth context on search iterations
+                if node_name == "search" and state.get("depth", 0) > 0:
+                    completed[-1] += f" (depth {state['depth']})"
+
                 progress_area.markdown("\n\n".join(f"- {n}" for n in completed))
             elif event_type == "done":
                 final_state = state
@@ -171,12 +143,7 @@ def main() -> None:
     progress_area.empty()
 
     if not final_state:
-        st.error("Review failed — no state returned.")
-        return
-
-    # --- Error states ---
-    if final_state.get("injection_flagged"):
-        st.error("Review aborted: prompt injection detected in the PR diff.")
+        st.error("Research failed.")
         return
 
     if final_state.get("error"):
@@ -185,77 +152,81 @@ def main() -> None:
 
     report = final_state.get("final_report")
     if not report:
-        st.warning("Review completed but the report could not be generated.")
+        st.warning("Research completed but no report was generated.")
         return
 
-    # --- Warnings ---
-    if final_state.get("secrets_found"):
-        st.warning(
-            f"Secrets detected and redacted before analysis: "
-            f"{', '.join(final_state['secrets_found'])}"
-        )
-
     # --- Metrics ---
-    risk = report.get("risk_score", 0.0)
-    findings = report.get("findings", [])
-    critical_count = sum(1 for f in findings if f.get("severity") == "critical")
-    high_count = sum(1 for f in findings if f.get("severity") == "high")
+    confidence = report.get("confidence_score", 0.0)
+    sources = report.get("sources", [])
+    depth = report.get("depth_reached", final_state.get("depth", 0))
 
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Risk Score", f"{risk:.1f} / 10")
-    m2.metric("Total Findings", len(findings))
-    m3.metric("Critical", critical_count)
-    m4.metric("High", high_count)
-    m5.metric("Cached", "Yes" if report.get("cached") else "No")
-
-    # --- Summary ---
-    st.markdown(f"**{report.get('summary', '')}**")
-
-    st.caption(
-        f"Model: {report.get('model_used', 'unknown')}  |  "
-        f"Tokens: {report.get('tokens_used', 0):,}  |  "
-        f"Guardrail passed: {'yes' if final_state.get('guardrail_passed') else 'no'}"
-    )
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Confidence", f"{confidence:.0%}")
+    m2.metric("Sources cited", len(sources))
+    m3.metric("Depth reached", depth)
+    m4.metric("Cached", "Yes" if report.get("cached") else "No")
 
     st.divider()
 
-    # --- Findings ---
-    st.subheader("Findings")
-    render_findings(findings)
+    # --- Summary ---
+    st.subheader("Summary")
+    st.markdown(report.get("summary", ""))
 
-    # --- Raw diff inspector ---
-    with st.expander("View raw diff (post-redaction)", expanded=False):
-        raw = final_state.get("raw_diff", "")
-        st.code(raw[:5000] + (" ... (truncated)" if len(raw) > 5000 else ""), language="diff")
+    # --- Key findings ---
+    findings = report.get("key_findings", [])
+    if findings:
+        st.subheader("Key findings")
+        for f in findings:
+            st.markdown(f"- {f}")
+
+    st.divider()
+
+    # --- Sources ---
+    st.subheader("Sources")
+    for s in sorted(sources, key=lambda x: x.get("relevance_score", 0), reverse=True):
+        rel = s.get("relevance_score", 0)
+        trust = s.get("trust_score", 0)
+        with st.expander(f"{s.get('title', s['url'])}  —  relevance {rel:.0%}", expanded=rel >= 0.7):
+            st.markdown(f"[{s['url']}]({s['url']})")
+            cols = st.columns(2)
+            cols[0].caption(f"Relevance: {rel:.0%}")
+            cols[1].caption(f"Source trust: {trust_label(trust)} ({trust:.0%})")
+            if s.get("excerpt"):
+                st.markdown(s["excerpt"])
+
+    # --- Sources inspector ---
+    scored = final_state.get("scored_sources", [])
+    with st.expander(f"All evaluated sources ({len(scored)} total)", expanded=False):
+        for s in sorted(scored, key=lambda x: x.get("relevance_score", 0), reverse=True):
+            rel = s.get("relevance_score", 0)
+            trust = s.get("trust_score", 0)
+            st.markdown(
+                f"**{rel:.0%}** relevance  |  **{trust:.0%}** trust  |  [{s['url']}]({s['url']})"
+            )
 
     # --- Feedback ---
     st.divider()
     st.subheader("Feedback")
-    st.caption("Help improve the eval dataset by marking findings as correct or incorrect.")
+    st.caption("Mark sources as useful or not to improve the eval dataset.")
 
-    feedback_submitted = False
-    for i, f in enumerate(findings):
-        finding_id = f"{f.get('category')}:{f.get('file_path')}:{f.get('line_range', '')}"
+    for i, s in enumerate(sources):
+        finding_id = f"source:{s['url']}"
         cols = st.columns([6, 1, 1])
-        cols[0].markdown(f"`{finding_id}`  {f.get('description', '')[:80]}")
-        if cols[1].button("Correct", key=f"correct_{i}"):
-            _submit_feedback(pr_url, finding_id, correct=True)
-            feedback_submitted = True
-        if cols[2].button("Wrong", key=f"wrong_{i}"):
-            _submit_feedback(pr_url, finding_id, correct=False)
-            feedback_submitted = True
-
-    if feedback_submitted:
-        st.success("Feedback saved.")
+        cols[0].markdown(f"[{s.get('title', s['url'])}]({s['url']})")
+        if cols[1].button("Useful", key=f"useful_{i}"):
+            _submit_feedback(question, finding_id, correct=True)
+            st.toast("Feedback saved.")
+        if cols[2].button("Not useful", key=f"not_{i}"):
+            _submit_feedback(question, finding_id, correct=False)
+            st.toast("Feedback saved.")
 
 
-def _submit_feedback(pr_url: str, finding_id: str, correct: bool) -> None:
+def _submit_feedback(question: str, finding_id: str, correct: bool) -> None:
     try:
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         from feedback.store import save_feedback
-        save_feedback({"pr_url": pr_url, "finding_id": finding_id, "correct": correct, "comment": None})
+        save_feedback({"pr_url": question, "finding_id": finding_id, "correct": correct, "comment": None})
     except Exception:
-        pass  # feedback is best-effort
+        pass
 
 
 if __name__ == "__main__":

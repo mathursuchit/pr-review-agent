@@ -1,11 +1,11 @@
 import structlog
-from agent.models import ReviewReport
-from agent.state import ReviewState
+from agent.models import ResearchReport
+from agent.state import ResearchState
 
 logger = structlog.get_logger()
 
 
-async def run(state: ReviewState) -> dict:
+async def run(state: ResearchState) -> dict:
     report = state.get("final_report")
     retry_count = state.get("retry_count", 0)
 
@@ -13,21 +13,20 @@ async def run(state: ReviewState) -> dict:
         logger.warning("guardrail_no_report", retry_count=retry_count)
         return {"guardrail_passed": False, "retry_count": retry_count + 1}
 
-    # Schema validation
     try:
-        validated = ReviewReport(**report)
+        validated = ResearchReport(**report)
     except Exception as e:
-        logger.warning("guardrail_schema_fail", error=str(e), retry_count=retry_count)
+        logger.warning("guardrail_schema_fail", error=str(e))
         return {"guardrail_passed": False, "retry_count": retry_count + 1}
 
-    # Hallucination check: verify cited file paths appear in the diff
-    diff = state.get("raw_diff", "")
-    corrected_findings = []
-    for finding in validated.findings:
-        if finding.file_path and finding.file_path not in diff and finding.file_path != "unknown":
-            logger.warning("guardrail_hallucinated_path", file_path=finding.file_path)
-            finding = finding.model_copy(update={"file_path": "unknown"})
-        corrected_findings.append(finding)
+    # Citation hallucination check — drop any cited URL not in scored_sources
+    known_urls = {s["url"] for s in state.get("scored_sources", [])}
+    clean_sources = []
+    for source in validated.sources:
+        if source.url not in known_urls:
+            logger.warning("guardrail_hallucinated_url", url=source.url)
+            continue
+        clean_sources.append(source)
 
-    validated = validated.model_copy(update={"findings": corrected_findings})
+    validated = validated.model_copy(update={"sources": clean_sources})
     return {"guardrail_passed": True, "final_report": validated.model_dump()}

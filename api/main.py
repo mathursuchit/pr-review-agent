@@ -6,7 +6,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from api.routes.review import router as review_router
+from api.routes.research import router as research_router
 from api.routes.feedback import router as feedback_router
 from api.metrics import setup_metrics
 from cache.semantic import setup_cache
@@ -29,7 +29,7 @@ app = FastAPI(title="PR Review Agent", version="1.0.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-app.include_router(review_router, prefix="/api/v1")
+app.include_router(research_router, prefix="/api/v1")
 app.include_router(feedback_router, prefix="/api/v1")
 
 setup_metrics(app)

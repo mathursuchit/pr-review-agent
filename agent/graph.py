@@ -1,45 +1,44 @@
 from langgraph.graph import StateGraph, END
-from agent.state import ReviewState
-from agent.nodes import fetch_diff, pre_scan, analyze, synthesize, guardrails
+from agent.state import ResearchState
+from agent.nodes import search, read_pages, score_relevance, decide_next, synthesize, guardrails
 
 
-def _route_after_prescan(state: ReviewState) -> str:
+def _route_after_search(state: ResearchState) -> str:
     if state.get("error"):
-        return "reject"
-    if state.get("injection_flagged"):
-        return "reject"
-    return "analyze_security"
+        return END
+    return "read_pages"
 
 
-def _route_after_guardrails(state: ReviewState) -> str:
+def _route_after_decide(state: ResearchState) -> str:
+    if state.get("should_continue"):
+        return "search"
+    return "synthesize"
+
+
+def _route_after_guardrails(state: ResearchState) -> str:
     if state.get("guardrail_passed"):
         return END
     if state.get("retry_count", 0) >= 1:
-        # Fail open after one retry — return partial report flagged
-        return END
+        return END  # fail open — return partial report
     return "synthesize"
 
 
 def build_graph() -> StateGraph:
-    g = StateGraph(ReviewState)
+    g = StateGraph(ResearchState)
 
-    g.add_node("fetch_diff", fetch_diff.run)
-    g.add_node("pre_scan", pre_scan.run)
-    g.add_node("analyze_security", analyze.security)
-    g.add_node("analyze_logic", analyze.logic)
-    g.add_node("analyze_tests", analyze.tests)
-    g.add_node("synthesize", synthesize.run)
-    g.add_node("post_guardrails", guardrails.run)
-    g.add_node("reject", pre_scan.reject)
+    g.add_node("search",           search.run)
+    g.add_node("read_pages",       read_pages.run)
+    g.add_node("score_relevance",  score_relevance.run)
+    g.add_node("decide_next",      decide_next.run)
+    g.add_node("synthesize",       synthesize.run)
+    g.add_node("post_guardrails",  guardrails.run)
 
-    g.set_entry_point("fetch_diff")
-    g.add_edge("fetch_diff", "pre_scan")
-    g.add_conditional_edges("pre_scan", _route_after_prescan)
-    g.add_edge("analyze_security", "analyze_logic")
-    g.add_edge("analyze_logic", "analyze_tests")
-    g.add_edge("analyze_tests", "synthesize")
-    g.add_edge("synthesize", "post_guardrails")
+    g.set_entry_point("search")
+    g.add_conditional_edges("search", _route_after_search)
+    g.add_edge("read_pages",      "score_relevance")
+    g.add_edge("score_relevance", "decide_next")
+    g.add_conditional_edges("decide_next", _route_after_decide)
+    g.add_edge("synthesize",      "post_guardrails")
     g.add_conditional_edges("post_guardrails", _route_after_guardrails)
-    g.add_edge("reject", END)
 
     return g.compile()

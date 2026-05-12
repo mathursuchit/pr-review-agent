@@ -1,0 +1,18 @@
+[
+  {
+    "id": "research-001",
+    "description": "Question about LLM production challenges — expects sources covering deployment, latency, cost",
+    "question": "What are the main challenges of deploying LLM-based agents in production?",
+    "expected_findings": ["sources_found", "report_generated"],
+    "skip": true,
+    "skip_reason": "requires live Tavily API key — enable in CI once TAVILY_API_KEY secret is set"
+  },
+  {
+    "id": "research-002",
+    "description": "Question about RAG evaluation — expects sources covering eval frameworks",
+    "question": "How do you evaluate the quality of a RAG pipeline?",
+    "expected_findings": ["sources_found", "report_generated"],
+    "skip": true,
+    "skip_reason": "requires live Tavily API key — enable in CI once TAVILY_API_KEY secret is set"
+  }
+]
