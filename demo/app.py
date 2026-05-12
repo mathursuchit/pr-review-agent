@@ -7,9 +7,30 @@ from pathlib import Path
 
 import streamlit as st
 
+# Inject Streamlit Cloud secrets into env vars before any agent imports
+for _key in ["OPENAI_API_KEY", "TAVILY_API_KEY", "LANGSMITH_API_KEY"]:
+    if hasattr(st, "secrets") and _key in st.secrets:
+        os.environ[_key] = st.secrets[_key]
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agent.graph import build_graph
+
+
+def _check_secrets() -> bool:
+    missing = [k for k in ("OPENAI_API_KEY", "TAVILY_API_KEY") if not os.environ.get(k)]
+    if missing:
+        st.error(
+            f"Missing required secrets: **{', '.join(missing)}**\n\n"
+            "Add them in the Streamlit Cloud dashboard → App settings → Secrets:\n"
+            "```toml\n"
+            "OPENAI_API_KEY = \"sk-...\"\n"
+            "TAVILY_API_KEY = \"tvly-...\"\n"
+            "LANGSMITH_API_KEY = \"ls__...\"  # optional\n"
+            "```"
+        )
+        return False
+    return True
 
 st.set_page_config(page_title="Research Agent", layout="wide")
 
@@ -79,6 +100,9 @@ def trust_label(score: float) -> str:
 
 
 def main() -> None:
+    if not _check_secrets():
+        return
+
     st.title("Research Agent")
     st.caption(
         "Searches the web, reads pages, scores source relevance, and synthesizes a cited report. "
