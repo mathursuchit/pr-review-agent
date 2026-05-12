@@ -1,6 +1,6 @@
 # PR Review Agent
 
-I built this to explore what it actually takes to put an LLM-based system into production, not just get it working in a notebook. The agent reviews GitHub pull requests for security issues, logic errors, and missing tests. The interesting part is everything around the LLM call: how you handle untrusted input, control cost, catch hallucinations, and measure quality over time.
+Built to explore what it actually takes to put an LLM-based system into production, not just get it working in a notebook. Reviews GitHub pull requests for security issues, logic errors, and missing tests. The interesting part is everything around the LLM call: handling untrusted input, controlling cost, catching hallucinations, and measuring quality over time.
 
 ## Architecture
 
