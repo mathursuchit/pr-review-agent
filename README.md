@@ -73,7 +73,11 @@ cp .env.example .env
 docker compose up
 ```
 
-The API is at `http://localhost:8000`. Prometheus at `http://localhost:9090`.
+| Service | URL |
+|---------|-----|
+| Streamlit demo | http://localhost:8501 |
+| API | http://localhost:8000 |
+| Prometheus | http://localhost:9090 |
 
 ```bash
 # Review a PR
