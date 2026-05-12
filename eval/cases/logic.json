@@ -1,0 +1,10 @@
+[
+  {
+    "id": "logic-001",
+    "description": "PR introduces off-by-one in pagination",
+    "pr_url": "https://github.com/mathursuchit/pr-review-agent/pull/2",
+    "expected_findings": ["logic"],
+    "skip": true,
+    "skip_reason": "placeholder — replace with a real PR URL before enabling"
+  }
+]
