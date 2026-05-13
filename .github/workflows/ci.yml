@@ -38,9 +38,9 @@ jobs:
     # Only run evals when secrets are available (skipped on forks)
     if: github.event_name == 'push'
     env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
-      LANGSMITH_PROJECT: pr-review-agent-ci
+      LANGSMITH_PROJECT: research-agent-ci
       LANGSMITH_TRACING: "true"
       GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
       API_KEY: ci-test-key
