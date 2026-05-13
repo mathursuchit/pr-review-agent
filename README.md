@@ -11,13 +11,13 @@ question
    |
 [read_pages] ── fetch + clean top pages in parallel
    |
-[score_relevance] ── GPT-4o-mini scores each source 0-1
+[score_relevance] ── llama-3.1-8b-instant scores each source 0-1
    |
 [decide_next] ── enough good sources? synthesize : search again
    |    ^
    |    └── loop (max_depth / token_budget hard stops)
    |
-[synthesize] ── GPT-4o writes cited report
+[synthesize] ── llama-3.3-70b-versatile writes cited report
    |
 [post_guardrails] ── schema check + drop hallucinated URLs
    |
@@ -27,7 +27,7 @@ final report
 ## Production features
 
 **Cost control**
-- Model routing: GPT-4o-mini for relevance scoring, GPT-4o for synthesis only
+- Model routing: llama-3.1-8b-instant for relevance scoring, llama-3.3-70b-versatile for synthesis only
 - Token budget enforced at the graph level — agent can't spiral past 50K tokens
 - Depth limit (1-3) enforced before any LLM call, not after
 
@@ -65,13 +65,13 @@ Eval cases are currently skipped pending CI secrets. Add `TAVILY_API_KEY` to Git
 
 ## Cost estimate
 
-~$0.02-0.05 per research query depending on depth and page count.
+~$0.00 per query on Groq free tier (1,000 Tavily searches/month free; Groq is free up to 14,400 req/day).
 
 ## Run locally
 
 ```bash
 cp .env.example .env
-# fill in OPENAI_API_KEY, TAVILY_API_KEY, API_KEY
+# fill in GROQ_API_KEY, TAVILY_API_KEY, API_KEY
 
 docker compose up
 ```
@@ -101,4 +101,4 @@ python eval/run_evals.py --fail-below 0.80
 
 ## Stack
 
-LangGraph, LangChain, OpenAI, Tavily, FastAPI, Redis, Prometheus, structlog, Pydantic v2, Docker
+LangGraph, LangChain, Groq (Llama 3), Tavily, FastAPI, Redis, Prometheus, structlog, Pydantic v2, Docker
