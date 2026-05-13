@@ -1,12 +1,12 @@
 import structlog
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 from agent.blog_state import BlogState
 
 logger = structlog.get_logger()
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
 
 class BlogSection(BaseModel):

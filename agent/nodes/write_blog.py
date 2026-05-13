@@ -1,11 +1,11 @@
 import structlog
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from agent.blog_state import BlogState
 
 logger = structlog.get_logger()
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0.4)
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
 PROMPT = ChatPromptTemplate.from_messages([
     (

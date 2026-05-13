@@ -7,7 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 
-for _key in ["OPENAI_API_KEY", "TAVILY_API_KEY", "LANGSMITH_API_KEY"]:
+for _key in ["GROQ_API_KEY", "TAVILY_API_KEY", "LANGSMITH_API_KEY"]:
     if hasattr(st, "secrets") and _key in st.secrets:
         os.environ[_key] = st.secrets[_key]
 
@@ -29,7 +29,7 @@ NODE_LABELS = {
 
 
 def _check_secrets() -> bool:
-    missing = [k for k in ("OPENAI_API_KEY", "TAVILY_API_KEY") if not os.environ.get(k)]
+    missing = [k for k in ("GROQ_API_KEY", "TAVILY_API_KEY") if not os.environ.get(k)]
     if missing:
         st.error(
             f"Missing required secrets: **{', '.join(missing)}**\n\n"
