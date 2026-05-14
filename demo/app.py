@@ -132,9 +132,9 @@ def main() -> None:
 
             1. Searches the web using Tavily
             2. Fetches and cleans the top pages
-            3. Scores each source for relevance (0-1) using GPT-4o-mini
+            3. Scores each source for relevance (0-1) using Llama 3.1-8B
             4. Decides whether to search again with a refined query or synthesize
-            5. Synthesizes a report with key findings and cited sources using GPT-4o
+            5. Synthesizes a report with key findings and cited sources using Llama 3.3-70B
             6. Validates citations — drops any URL not in the actual source list
             """
         )
